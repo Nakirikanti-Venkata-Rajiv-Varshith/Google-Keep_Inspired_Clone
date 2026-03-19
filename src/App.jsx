@@ -1,41 +1,89 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "./Header";
 import Footer from "./Footer";
 import Note from "./Note";
-import CreateArea from "./CreateArea"
+import CreateArea from "./CreateArea";
+import AiTile from "./AiTile";
 
 function App() {
+
   const [notes, setNotes] = useState([]);
 
+  // Load notes from database 
+  useEffect(() => {
+    fetch("/api/notes", {
+      credentials: "include"  
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to load notes");
+        return res.json();
+      })
+      .then(data => setNotes(data))
+      .catch(err => console.error(err));
+  }, []);
+
+
+
+  // Add note save to database
   function addNote(newNote) {
-    setNotes(prevNotes => {
-      return [...prevNotes, newNote];
-    });
+
+    fetch("/api/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",   // ⭐ REQUIRED
+      body: JSON.stringify(newNote)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Create failed"); // ⭐ error check
+        return res.json();
+      })
+      .then(savedNote => {
+        // ⭐ IMPORTANT: append returned DB note (contains id + content)
+        setNotes(prevNotes => [...prevNotes, savedNote]);
+      })
+      .catch(err => console.error(err));
   }
 
+
+
+  // Delete note remove from database
   function deleteNote(id) {
-    setNotes(prevNotes => {
-      return prevNotes.filter((noteItem, index) => {
-        return index !== id;
+
+    fetch(`/api/notes/${id}`, {
+      method: "DELETE",
+      credentials: "include"   // ⭐ REQUIRED
+    })
+    .then(res => {
+      if (!res.ok) throw new Error("Delete failed");
+
+      // ⭐ ONLY update UI after server confirms delete
+      setNotes(prevNotes => {
+        return prevNotes.filter(noteItem => noteItem.id !== id);
       });
-    });
+    })
+    .catch(()=> alert("Delete failed"));
   }
+
+
 
   return (
     <div>
       <Header />
       <CreateArea onAdd={addNote} />
-      {notes.map((noteItem, index) => {
+
+      {notes.map((noteItem) => {
         return (
           <Note
-            key={index}
-            id={index}
+            key={noteItem.id}
+            id={noteItem.id}
             title={noteItem.title}
             content={noteItem.content}
             onDelete={deleteNote}
           />
         );
       })}
+      <AiTile />
+
       <Footer />
     </div>
   );
